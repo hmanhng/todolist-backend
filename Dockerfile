@@ -8,7 +8,7 @@ RUN npm install
 
 COPY . .
 
-FROM node:18-alpine
+FROM dhi.io/node:24-alpine3.23
 
 WORKDIR /app
 
