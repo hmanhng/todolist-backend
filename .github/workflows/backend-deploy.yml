@@ -1,4 +1,4 @@
-name: Deploy Backend to ECS
+name: Build Backend Image to ECR
 
 on:
   push:
@@ -6,11 +6,10 @@ on:
 
 env:
   AWS_REGION: eu-north-1
-  ECR_REPOSITORY: backend
-  CONTAINER_NAME: app # Phải khớp với tên container trong Terraform của Mạnh
+  ECR_REPOSITORY: todolist-dev-argocd-backend
 
 jobs:
-  deploy-backend:
+  build-backend:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -34,7 +33,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push backend image
-        id: build-image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -44,29 +42,3 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # Bước này lấy file JSON gốc và dùng jq để lọc bỏ các trường "chỉ đọc" gây lỗi
-      # - name: Download and clean task definition
-      #   run: |
-      #     aws ecs describe-task-definition --task-definition ${{ env.ECR_REPOSITORY }} \
-      #       --query taskDefinition > raw-task-def.json
-      #     # Lọc bỏ các trường metadata gây lỗi AccessDenied/Validation
-      #     jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' raw-task-def.json > task-definition.json
-
-      # # Dùng Action của AWS để tự động thay image mới vào file JSON
-      # - name: Fill in the new image ID in the Amazon ECS task definition
-      #   id: task-def
-      #   uses: aws-actions/amazon-ecs-render-task-definition@v1
-      #   with:
-      #     task-definition: task-definition.json
-      #     container-name: ${{ env.CONTAINER_NAME }}
-      #     image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-
-      # # Tự động đăng ký và cập nhật Service (thay thế cho bước register và update thủ công)
-      # - name: Deploy Amazon ECS task definition
-      #   uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-      #   with:
-      #     task-definition: ${{ steps.task-def.outputs.task-definition }}
-      #     service: ${{ vars.ECS_SERVICE_NAME }}
-      #     cluster: ${{ vars.ECS_CLUSTER_NAME }}
-      #     wait-for-service-stability: true
