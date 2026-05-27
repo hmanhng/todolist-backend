@@ -7,6 +7,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  ARGOCD_REPO: hmanhng/argocd-todolist
+  ARGOCD_BRANCH: master
 
 jobs:
   build-backend:
@@ -39,3 +41,24 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Checkout Argo CD manifests
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ARGOCD_REPO }}
+          ref: ${{ env.ARGOCD_BRANCH }}
+          token: ${{ secrets.ARGOCD_REPO_TOKEN }}
+          path: argocd-todolist
+
+      - name: Update Argo CD backend image tag
+        run: |
+          cd argocd-todolist
+          sed -i "s|image: ghcr.io/hmanhng/todolist-backend:.*|image: ghcr.io/hmanhng/todolist-backend:${GITHUB_SHA}|" apps/backend/deployment.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            exit 0
+          fi
+          git add apps/backend/deployment.yaml
+          git commit -m "chore: update backend image to ${GITHUB_SHA}"
+          git push origin "HEAD:${ARGOCD_BRANCH}"
